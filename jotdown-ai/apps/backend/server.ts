@@ -17,15 +17,6 @@ server.get('/', async (request, reply) => {
 import uploadRoutes from './routes/upload';
 import summarizeRoutes from './routes/summarize';
 
-server.register(rateLimit, {
-  max: 3,
-  timeWindow: '1 minute',
-  errorResponseBuilder: () => ({
-    statusCode: 429,
-    error: 'Too Many Requests',
-    message: 'You have exceeded the allowed number of requests. Please try again later.'
-  })
-});
 
 server.register(uploadRoutes, { prefix: '/api/upload' });
 server.register(summarizeRoutes, { prefix: '/api/summarize' });

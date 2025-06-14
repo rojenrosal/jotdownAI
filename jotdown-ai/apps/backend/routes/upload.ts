@@ -1,32 +1,41 @@
 import { FastifyPluginAsync } from 'fastify';
-import multer from 'fastify-multer';
 import fs from 'fs';
+import path from 'path';
 import { transcribeAudio } from '../openai';
 import { supabase } from '../supabase';
-
-const upload = multer({ dest: 'uploads/' });
+import multipart from '@fastify/multipart';
 
 const uploadRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.register(multer.contentParser);
+  await fastify.register(multipart);
 
-  fastify.post('/', { preHandler: upload.single('audio') }, async (req, reply) => {
-    const file = (req as any).file;
-    if (!file) return reply.status(400).send({ error: 'No audio file provided' });
+  fastify.post('/', async (req, reply) => {
+    const file = await req.file(); 
 
-    const transcript = await transcribeAudio(file.path);
+    if (!file) {
+      return reply.status(400).send({ error: 'No audio file provided' });
+    }
+
+    const filePath = path.join('uploads', file.filename);
+    const buffer = await file.toBuffer();
+
+    fs.writeFileSync(filePath, buffer); 
+
+    const transcript = await transcribeAudio(filePath);
 
     const { data, error } = await supabase.from('recordings').insert([
       {
-        filename: file.originalname,
-        transcript
+        filename: file.filename,
+        transcript,
       }
     ]).select().single();
 
-    fs.unlinkSync(file.path); // cleanup
+    fs.unlinkSync(filePath); 
 
-    if (error) return reply.status(500).send({ error: error.message });
+    if (error) {
+      return reply.status(500).send({ error: error.message });
+    }
 
-    reply.send(data);
+    return reply.send(data);
   });
 };
 
